@@ -1,6 +1,9 @@
 """
 Guardian Super Dashboard - The Ultimate Plant Care Hub
-✅ UPDATED WITH FIX #3: Plant removal functionality
+✅ UPDATED WITH ALL FIXES:
+   - Fix #1: "Add Another Plant" button now works (uses current_page instead of page)
+   - Fix #2: Plant removal functionality
+   - Fix #3: Improved UI for remove button visibility
 """
 
 import streamlit as st
@@ -195,13 +198,16 @@ def suggest_next_action(plant):
 def show_guardian_super_dashboard():
     """
     THE ULTIMATE DASHBOARD
-    ✅ NOW WITH PLANT REMOVAL FEATURE
+    ✅ ALL FIXES APPLIED:
+       - Add Another Plant button WORKS
+       - Remove plant with confirmation
+       - Better UX
 
     Everything a plant guardian needs in one scrollable page:
     - Live impact metrics (top)
     - Plant cards with integrated actions
     - Inline Plant Doctor
-    - ✅ NEW: Remove plant button
+    - Remove plant button
     - Detailed impact projections (bottom)
     """
 
@@ -272,7 +278,15 @@ def show_guardian_super_dashboard():
 
             # Plant card container
             with st.container():
-                st.markdown(f"#### {name}")
+                # ✅ FIX: Added quick remove button next to name for better discoverability
+                name_col, remove_col = st.columns([5, 1])
+                with name_col:
+                    st.markdown(f"#### {name}")
+                with remove_col:
+                    # Quick remove icon (with tooltip)
+                    if st.button("🗑️", key=f"quick_remove_{plant_id}", help="Remove this plant"):
+                        st.session_state[f'confirm_remove_{plant_id}'] = True
+                        st.rerun()
 
                 # Top row: Age + Health
                 col_age, col_health = st.columns(2)
@@ -324,7 +338,7 @@ def show_guardian_super_dashboard():
                     water_count = len(st.session_state.watering_logs.get(plant_id, []))
                     st.caption(f"✅ Watered {water_count} times total")
 
-                    # ✅ FIX #3: REMOVE PLANT BUTTON
+                    # More Options expander
                     with st.expander("⚙️ More Options"):
                         st.markdown("**Update Status:**")
 
@@ -361,48 +375,48 @@ def show_guardian_super_dashboard():
                                 st.rerun()
 
                         with col_remove:
-                            # ✅ NEW: REMOVE BUTTON
+                            # REMOVE BUTTON
                             if st.button("🗑️ Remove", key=f"remove_{plant_id}", type="secondary",
                                          use_container_width=True):
                                 st.session_state[f'confirm_remove_{plant_id}'] = True
                                 st.rerun()
 
-                        # ✅ CONFIRMATION DIALOG
-                        if st.session_state.get(f'confirm_remove_{plant_id}', False):
-                            st.warning(f"⚠️ Are you sure you want to remove **{name}** from your garden?")
+                # ✅ CONFIRMATION DIALOG (moved outside expander for visibility)
+                if st.session_state.get(f'confirm_remove_{plant_id}', False):
+                    st.warning(f"⚠️ Are you sure you want to remove **{name}** from your garden?")
 
-                            col_yes, col_no = st.columns(2)
+                    col_yes, col_no = st.columns(2)
 
-                            with col_yes:
-                                if st.button("Yes, remove it", key=f"confirm_yes_{plant_id}", type="primary"):
-                                    # Remove from session state
-                                    st.session_state.planted_trees = [
-                                        p for p in st.session_state.planted_trees if p['id'] != plant_id
-                                    ]
+                    with col_yes:
+                        if st.button("Yes, remove it", key=f"confirm_yes_{plant_id}", type="primary"):
+                            # Remove from session state
+                            st.session_state.planted_trees = [
+                                p for p in st.session_state.planted_trees if p['id'] != plant_id
+                            ]
 
-                                    # Remove watering logs
-                                    if plant_id in st.session_state.watering_logs:
-                                        del st.session_state.watering_logs[plant_id]
+                            # Remove watering logs
+                            if plant_id in st.session_state.watering_logs:
+                                del st.session_state.watering_logs[plant_id]
 
-                                    # Update user state if no plants left
-                                    if len(st.session_state.planted_trees) == 0:
-                                        st.session_state.user_state = "EXPLORER"
+                            # Update user state if no plants left
+                            if len(st.session_state.planted_trees) == 0:
+                                st.session_state.user_state = "EXPLORER"
 
-                                    # Save to database
-                                    try:
-                                        db_handler.save_planted_trees(st.session_state.user_id,
-                                                                      st.session_state.planted_trees)
-                                    except:
-                                        pass
+                            # Save to database
+                            try:
+                                db_handler.save_planted_trees(st.session_state.user_id,
+                                                              st.session_state.planted_trees)
+                            except:
+                                pass
 
-                                    st.success(f"🗑️ {name} removed from garden")
-                                    del st.session_state[f'confirm_remove_{plant_id}']
-                                    st.rerun()
+                            st.success(f"🗑️ {name} removed from garden")
+                            del st.session_state[f'confirm_remove_{plant_id}']
+                            st.rerun()
 
-                            with col_no:
-                                if st.button("No, keep it", key=f"confirm_no_{plant_id}"):
-                                    del st.session_state[f'confirm_remove_{plant_id}']
-                                    st.rerun()
+                    with col_no:
+                        if st.button("No, keep it", key=f"confirm_no_{plant_id}"):
+                            del st.session_state[f'confirm_remove_{plant_id}']
+                            st.rerun()
 
                 with col_doctor:
                     st.markdown("**🩺 AI Plant Doctor:**")
@@ -443,9 +457,10 @@ def show_guardian_super_dashboard():
     col_spacer1, col_button, col_spacer2 = st.columns([1, 2, 1])
 
     with col_button:
-        if st.button("➕ Add Another Plant", type="primary"):
-            # Navigate back to Home to select plant
-            st.session_state.page = "Home"
+        # ✅ FIX #1: CRITICAL BUG FIX - Changed from st.session_state.page to st.session_state.current_page
+        if st.button("➕ Add Another Plant", type="primary", use_container_width=True):
+            # Navigate to Air Quality Hub to select a new plant
+            st.session_state.current_page = "🌫️ Air Quality Hub"  # ✅ FIXED: Was using wrong key 'page'
             st.rerun()
 
     st.markdown("---")

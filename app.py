@@ -93,15 +93,12 @@ except Exception:
     def check_and_award_badges():
         pass
 
-# Test Firebase connection on startup
-if st.button("🧪 Test Firebase Connection (Debug)", key="test_firebase"):
-    if db_handler.test_firebase_connection():
-        st.success("✅ Firebase connected!")
-    else:
-        st.error("❌ Firebase connection failed")
 # Add to st.set_page_config():
 st.set_page_config(
-    initial_sidebar_state="collapsed"  # ← Add this line!
+    page_title="🌳 AirCare - Plant Smarter",
+    page_icon="🌳",
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # Add first-time user hint:
@@ -110,29 +107,65 @@ if 'first_visit' not in st.session_state:
 
 if st.session_state.first_visit:
     st.markdown("""
-    <div style='background: #667eea; color: white; padding: 15px; border-radius: 10px;'>
-        👈 Tap the <strong>>></strong> button to open menu!
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                color: white; padding: 20px; border-radius: 15px; text-align: center;
+                margin: 10px 0 20px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+        <p style='font-size: 20px; margin: 0; font-weight: bold;'>
+            📱 First time here?
+        </p>
+        <p style='font-size: 16px; margin: 12px 0 0 0;'>
+            Tap the <strong style='background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;'>≡</strong> 
+            button in the <strong>top-left corner</strong> to open the navigation menu!
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
-    if st.button("Got it! ✓"):
+    if st.button("Got it! ✓", type="primary"):
         st.session_state.first_visit = False
         st.rerun()
+
+
 def load_user_data_if_logged_in():
-    """
-    Called on every app run to restore user data from Firebase if already logged in
-    """
     if st.session_state.get('logged_in', False) and st.session_state.get('user_id'):
-        # User is logged in - check if we need to reload from DB
+        # Load planted trees if not already loaded
         if 'planted_trees' not in st.session_state or st.session_state.planted_trees is None:
             try:
                 loaded_trees = db_handler.load_planted_trees(st.session_state.user_id)
                 if loaded_trees:
                     st.session_state.planted_trees = loaded_trees
                     st.session_state.user_state = "GUARDIAN" if len(loaded_trees) > 0 else "EXPLORER"
+                else:
+                    st.session_state.planted_trees = []
+                    st.session_state.user_state = "EXPLORER"
             except:
                 st.session_state.planted_trees = []
                 st.session_state.user_state = "EXPLORER"
+
+        # ✅ FIXED: Location loading now OUTSIDE the try/except block
+        # This runs ALWAYS when logged in, not just on errors
+        if 'user_location' not in st.session_state or st.session_state.user_location is None:
+            location_data = load_user_location()
+            if location_data:
+                st.session_state.user_location = location_data['location_name']
+                st.session_state.latitude = location_data['latitude']
+                st.session_state.longitude = location_data['longitude']
+
+                # Also restore climate/soil data
+                st.session_state.location = {
+                    "address": location_data['location_name'],
+                    "latitude": location_data['latitude'],
+                    "longitude": location_data['longitude']
+                }
+                st.session_state.climate_data = get_climate_data(
+                    location_data['latitude'],
+                    location_data['longitude']
+                )
+                st.session_state.soil_data = get_soil_data(
+                    location_data['latitude'],
+                    location_data['longitude']
+                )
+
+
 def add_plant_to_garden_safe(plant_data):
     """Universal function to add plant with proper initialization"""
     plant = standardize_plant_data(plant_data)
@@ -165,6 +198,81 @@ def add_plant_to_garden_safe(plant_data):
         return False
 
     return True
+
+
+def save_user_location(location_name, latitude, longitude):
+    """
+    Save user's location to Firebase for persistence across sessions
+
+    Args:
+        location_name (str): Full address/location name
+        latitude (float): Latitude coordinate
+        longitude (float): Longitude coordinate
+
+    Returns:
+        bool: True if saved successfully
+    """
+    if not st.session_state.get('user_id'):
+        return False
+
+    try:
+        # Prepare location data
+        location_data = {
+            'location_name': location_name,
+            'latitude': latitude,
+            'longitude': longitude,
+            'last_updated': datetime.datetime.now().isoformat()
+        }
+
+        # Load existing user data
+        existing_data = db_handler.load_user_data(st.session_state.user_id) or {}
+
+        # Merge location with existing data
+        existing_data.update(location_data)
+
+        # Save to Firebase
+        success = db_handler.save_user_data(st.session_state.user_id, existing_data)
+
+        if success:
+            # Update session state
+            st.session_state.user_location = location_name
+            st.session_state.latitude = latitude
+            st.session_state.longitude = longitude
+            return True
+
+        return False
+
+    except Exception as e:
+        st.error(f"Location save error: {e}")
+        return False
+
+
+def load_user_location():
+    """
+    Load user's saved location from Firebase
+
+    Returns:
+        dict or None: Location data with 'location_name', 'latitude', 'longitude'
+    """
+    if not st.session_state.get('user_id'):
+        return None
+
+    try:
+        user_data = db_handler.load_user_data(st.session_state.user_id)
+
+        if user_data and 'location_name' in user_data:
+            return {
+                'location_name': user_data['location_name'],
+                'latitude': user_data.get('latitude'),
+                'longitude': user_data.get('longitude')
+            }
+
+        return None
+
+    except Exception as e:
+        return None
+
+
 def standardize_plant_data(plant):
     """
     Ensure all plants have consistent field names.
@@ -202,6 +310,8 @@ def standardize_plant_data(plant):
             plant[key] = default_value
 
     return plant
+
+
 # Load environment
 load_dotenv()
 
@@ -391,6 +501,12 @@ def show_welcome_screen():
                             st.session_state.soil_data = get_soil_data(location.latitude, location.longitude)
                     except Exception as e:
                         pass  # Location detection is optional
+                        # ✅ SAVE LOCATION TO FIREBASE
+                        save_user_location(
+                            location.address,
+                            location.latitude,
+                            location.longitude
+                        )
                 time.sleep(1)
                 st.rerun()
 
@@ -431,9 +547,9 @@ def show_first_plant_celebration():
     """, unsafe_allow_html=True)
 
     time.sleep(3)
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
-st.set_page_config(page_title="AirCare - Tree & Air Quality Planner", page_icon="🌳", layout="wide")
+
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
 
 # ===========================
@@ -554,6 +670,8 @@ def init_user_session():
                 st.rerun()
 
     return False  # Stop execution while on login screen
+
+
 # ===========================
 # AIR QUALITY FUNCTIONS
 # ===========================
@@ -707,7 +825,6 @@ def get_aqi_action_plan(aqi_index, pm25, location_data):
 
 def recommend_plants_by_aqi(pm25, aqi_index):
     """Recommend specific plants based on current pollution levels"""
-
 
     # Get full plant database
     all_trees = get_tree_data()
@@ -1017,24 +1134,43 @@ if st.session_state.get('show_plant_selector', False):
                         st.markdown(f"**{rec['name']}**")
                         st.caption(rec['reason'])
 
-                        # FIXED: Unique key + proper add function + rerun
-                        if st.button(f"Add", key=f"modal_aqi_add_{rec['name']}_{idx}"):
-                            from tree_data import get_tree_data, get_balcony_plants_data
+                        # Check if already in garden
+                        already_in_garden = any(p['name'] == rec['name'] for p in st.session_state.planted_trees)
 
-                            all_plants = get_tree_data() + get_balcony_plants_data()
-                            full_plant = next((p for p in all_plants if p['name'] == rec['name']), None)
+                        if already_in_garden:
+                            st.success("✅ In Garden")
+                        else:
+                            # View Guide button
+                            if st.button(f"📋 Guide", key=f"modal_guide_{rec['name']}_{idx}"):
+                                from tree_data import get_tree_data, get_balcony_plants_data
 
-                            if full_plant:
-                                # Use the safe add function (handles all state + DB)
-                                if add_plant_to_garden_safe(full_plant):
-                                    add_xp(50, f"Planted {rec['name']}!")
-                                    check_and_award_badges()
+                                all_plants = get_tree_data() + get_balcony_plants_data()
+                                full_plant = next((p for p in all_plants if p['name'] == rec['name']), None)
+
+                                if full_plant:
+                                    st.session_state.selected_tree = full_plant
                                     st.session_state.show_plant_selector = False
-                                    st.success(f"✅ {rec['name']} added to My Garden!")
-                                    time.sleep(0.5)  # Brief pause so user sees the message
-                                    st.rerun()  # CRITICAL: Refresh to show Guardian mode
-                            else:
-                                st.error(f"❌ Plant data not found for {rec['name']}")
+                                    st.session_state.current_page = "Planting Guide"
+                                    st.rerun()
+
+                            # Quick Add button
+                            if st.button(f"➕ Add", key=f"modal_aqi_add_{rec['name']}_{idx}"):
+                                from tree_data import get_tree_data, get_balcony_plants_data
+
+                                all_plants = get_tree_data() + get_balcony_plants_data()
+                                full_plant = next((p for p in all_plants if p['name'] == rec['name']), None)
+
+                                if full_plant:
+                                    if add_plant_to_garden_safe(full_plant):
+                                        add_xp(50, f"Planted {rec['name']}!")
+                                        check_and_award_badges()
+                                        st.session_state.show_plant_selector = False
+                                        st.success(f"✅ {rec['name']} added!")
+                                        time.sleep(0.5)
+                                        st.session_state.current_page = "🌿 My Garden"
+                                        st.rerun()
+                                else:
+                                    st.error(f"❌ Plant data not found for {rec['name']}")
         else:
             st.warning("Set location first to see AQI-based recommendations")
 
@@ -1066,6 +1202,8 @@ if st.session_state.get('show_plant_selector', False):
         st.rerun()
 
     st.markdown("---")
+
+
 # ===========================
 # Initialize session state
 # ===========================
@@ -1100,7 +1238,7 @@ def init_session_state():
         'green_shield_data': {},
 
         # Beta features
-        'beta_features_enabled': False  # Set to True to enable Community/Marketplace
+        'beta_features_enabled': True  # Set to True to enable Community/Marketplace
     }
 
     for k, v in defaults.items():
@@ -1221,10 +1359,10 @@ with st.sidebar:
         if st.session_state.beta_features_enabled:
             st.markdown("---")
             st.markdown("**🧪 Beta Features:**")
-            if st.button("👥 Community",width='stretch' ):
+            if st.button("👥 Community", width='stretch'):
                 navigate_to("Community")
             if st.button("🛒 Marketplace", width='stretch'):
-                navigate_to("Marketplace")
+                navigate_to("🛒 Marketplace")
         # Admin panel (in sidebar)
         if "admin" in st.session_state.get('user_id', '').lower():
             st.markdown("---")
@@ -1247,6 +1385,7 @@ with st.sidebar:
                 )
 display_profile_sidebar()
 display_tree_svg()
+
 
 # ===========================
 # Utility Functions
@@ -1357,6 +1496,12 @@ if st.session_state.current_page == "Home":
                         st.success(f"✅ Found: {location.address}")
                         st.session_state.climate_data = get_climate_data(location.latitude, location.longitude)
                         st.session_state.soil_data = get_soil_data(location.latitude, location.longitude)
+                        # ✅ SAVE LOCATION TO FIREBASE
+                        save_user_location(
+                            location.address,
+                            location.latitude,
+                            location.longitude
+                        )
 
                         if st.session_state.is_balcony_mode:
                             st.session_state.recommended_trees = get_balcony_recommendations(
@@ -1478,8 +1623,9 @@ elif st.session_state.current_page == "🌫️ Air Quality Hub":
                 st.markdown(f"""
                 <div style='background-color: {color}; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 30px;'>
                     <h1 style='color: white; margin: 0;'>{label}</h1>
-                    <h3 style='color: white; margin: 10px 0 0 0;'>AQI Index: {aqi['aqi_index']}/5</h3>
-                    <p style='color: white; margin: 5px 0 0 0;'>Updated: {aqi['timestamp'].strftime('%I:%M %p')}</p>
+                    <h3 style='color: white; margin: 10px 0 0 0;'>Air Quality Level: {aqi['aqi_index']} of 5</h3>
+                    <p style='color: white; font-size: 14px; margin: 8px 0; opacity: 0.9;'>1 = Good | 2 = Fair | 3 = Moderate | 4 = Poor | 5 = Very Poor</p>
+                    <p style='color: white; margin: 5px 0 0 0; opacity: 0.8;'>Updated: {aqi['timestamp'].strftime('%I:%M %p')}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -1615,43 +1761,60 @@ elif st.session_state.current_page == "🌫️ Air Quality Hub":
                                                 st.rerun()
                     else:
                         st.info("No recommendations yet. Return to Home to set location and preferences.")
-                        # ============================================
-                        # QUICK AQI-BASED PICKS (OPTIONAL)
-                        # ============================================
-                        st.markdown("---")
-                        st.markdown("---")
-                        st.subheader("💨 Quick AQI-Based Picks")
-                        st.caption("These plants are specifically good for today's pollution levels")
 
-                # Quick plant recommendations based on AQI
+                # ============================================
+                # QUICK AQI-BASED PLANT RECOMMENDATIONS
+                # ============================================
                 st.markdown("---")
                 st.subheader("🌱 Plants Recommended for Today's Air Quality")
                 plant_recs = recommend_plants_by_aqi(comps.get('pm2_5'), aqi['aqi_index'])
-                rec_cols = st.columns(len(plant_recs))
-                for idx, rec in enumerate(plant_recs):
-                    with rec_cols[idx]:
-                        st.markdown(f"**{rec['name']}**")
-                        st.caption(rec['reason'])
-                        if st.button(f"Add {rec['name']}", key=f"add_plant_aqi_{idx}"):
-                            # ✅ FETCH FULL PLANT DATA FROM DATABASE
-                            from tree_data import get_tree_data, get_balcony_plants_data
 
-                            # Combine all available plants
-                            all_plants = get_tree_data() + get_balcony_plants_data()
+                if plant_recs and len(plant_recs) > 0:
+                    rec_cols = st.columns(len(plant_recs))
+                    for idx, rec in enumerate(plant_recs):
+                        with rec_cols[idx]:
+                            st.markdown(f"**{rec['name']}**")
+                            st.caption(rec.get('reason', 'Air purifying plant'))
 
-                            # Find the full plant object by name
-                            full_plant = next((p for p in all_plants if p['name'] == rec['name']), None)
+                            # View Details button - goes to Planting Guide
+                            if st.button(f"📋 View Guide", key=f"view_guide_aqi_{idx}"):
+                                # Get full plant data
+                                from tree_data import get_tree_data, get_balcony_plants_data
 
-                            if full_plant:
-                                # Use the safe add function (handles all state + DB)
-                                if add_plant_to_garden_safe(full_plant):
-                                    add_xp(50, f"Planted {rec['name']}!")
-                                    check_and_award_badges()
-                                    st.success(f"✅ {rec['name']} added to My Garden!")
-                                    time.sleep(0.5)  # Brief pause so user sees the message
-                                    st.rerun()  # CRITICAL: Refresh to show Guardian mode
+                                all_plants = get_tree_data() + get_balcony_plants_data()
+                                full_plant = next((p for p in all_plants if p['name'] == rec['name']), None)
+
+                                if full_plant:
+                                    st.session_state.selected_tree = full_plant
+                                    navigate_to("Planting Guide")
+                                else:
+                                    st.error(f"Plant details not found for {rec['name']}")
+
+                            # Quick Add button with duplicate check
+                            already_in_garden = any(p['name'] == rec['name'] for p in st.session_state.planted_trees)
+
+                            if already_in_garden:
+                                st.success("✅ In Garden")
                             else:
-                                st.error(f"❌ Plant data not found for {rec['name']}")
+                                if st.button(f"➕ Quick Add", key=f"quick_add_aqi_{idx}", type="secondary"):
+                                    from tree_data import get_tree_data, get_balcony_plants_data
+
+                                    all_plants = get_tree_data() + get_balcony_plants_data()
+                                    full_plant = next((p for p in all_plants if p['name'] == rec['name']), None)
+
+                                    if full_plant:
+                                        if add_plant_to_garden_safe(full_plant):
+                                            add_xp(50, f"Planted {rec['name']}!")
+                                            check_and_award_badges()
+                                            st.success(f"✅ {rec['name']} added!")
+                                            # Force page refresh to show Guardian mode
+                                            time.sleep(0.5)
+                                            navigate_to("🌿 My Garden")
+                                    else:
+                                        st.error(f"❌ Plant data not found")
+                else:
+                    st.info("Unable to get plant recommendations. Please try again.")
+
                 # Health recommendations
                 st.markdown("---")
                 st.subheader("⚕️ Health Recommendations")
@@ -1777,23 +1940,28 @@ elif st.session_state.current_page == "Planting Guide":
         # Track This Plant
         st.subheader("📊 Track This Plant")
 
-        if st.button("✅ Add to My Garden", type="primary", key="add_from_planting_guide"):
-            tree_to_track = tree.copy()
-            tree_to_track['id'] = str(uuid.uuid4())  # UNIQUE ID
-            tree_to_track['planted_date'] = datetime.datetime.now().strftime("%Y-%m-%d")
-            tree_to_track['status'] = "Newly Planted"
-            tree_to_track['health'] = "Good"
+        # Check if already in garden
+        already_in_garden = any(p['name'] == tree['name'] for p in st.session_state.planted_trees)
 
-            st.session_state.planted_trees.append(tree_to_track)
-            st.session_state.user_profile['trees_planted'] = len(st.session_state.planted_trees)
+        if already_in_garden:
+            st.success(f"✅ {tree['name']} is already in your garden!")
+            if st.button("🌿 Go to My Garden", type="primary", key="go_to_garden_from_guide"):
+                navigate_to("🌿 My Garden")
+        else:
+            if st.button("✅ Add to My Garden", type="primary", key="add_from_planting_guide"):
+                # Use the safe add function that handles everything
+                if add_plant_to_garden_safe(tree):
+                    add_xp(50, f"Planted {tree['name']}!")
+                    check_and_award_badges()
 
-            add_xp(50, f"Planted {tree['name']}!")
-            check_and_award_badges()
+                    # Show celebration for first plant
+                    if len(st.session_state.planted_trees) == 1:
+                        st.session_state.show_celebration = True
 
-            st.success(f"✅ {tree['name']} added! View in → 🌿 My Garden.")
-
-            # AUTO-NAVIGATE
-            # Track This Plant
+                    st.success(f"✅ {tree['name']} added to your garden!")
+                    time.sleep(0.5)
+                    # Navigate to Guardian Dashboard
+                    navigate_to("🌿 My Garden")
 
 # ===========================
 
@@ -2492,6 +2660,4 @@ elif st.session_state.current_page == "About":
         if st.button("👥 Join Community", type="secondary", width='stretch'):
             navigate_to("Community")
 
-
 st.markdown("---")
-
