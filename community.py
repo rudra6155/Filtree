@@ -13,8 +13,8 @@ def initialize_community():
         st.session_state.community_posts = [
             {
                 'id': str(uuid.uuid4()),
-                'username': 'PlantMaster',
-                'content': 'Just planted my 10th balcony plant! Snake Plant is thriving 🪴',
+                'username': 'Walter White',
+                'content': 'Finally got my Lily of the Valley thriving this season. Such a delicate plant, yet deceptively powerful if you know its secrets… Funny how the smallest things can change everything.',
                 'plant_name': 'Snake Plant',
                 'timestamp': '2025-11-15T10:30:00',
                 'likes': 12,
@@ -22,8 +22,8 @@ def initialize_community():
             },
             {
                 'id': str(uuid.uuid4()),
-                'username': 'GreenGuru',
-                'content': 'My Neem tree reached Sapling stage! So excited to see it grow 🌳',
+                'username': 'Harvey Spector',
+                'content': 'Just added a new orchid to my collection. Like any good case, it’s all about precision, presentation, and knowing when to prune. You don’t get to the top by watering weeds.',
                 'plant_name': 'Neem',
                 'timestamp': '2025-11-15T08:15:00',
                 'likes': 8,
@@ -32,12 +32,24 @@ def initialize_community():
             {
                 'id': str(uuid.uuid4()),
                 'username': 'Saul Goodman',
-                'content': 'Started my balcony garden today with Tulsi and Mint. Any care tips?',
+                'content': 'Started growing cacti in my garden. Low maintenance, tough exterior, but trust me—if you get too close, you’ll feel the sting. Better call someone who knows how to handle it.',
+                'plant_name': None,
+                'timestamp': '2025-11-14T18:45:00',
+                'likes': 5,
+                'liked_by': []
+            },
+            {
+                'id': str(uuid.uuid4()),
+                'username':'Daenerys Targaryen',
+                'content': 'My dragonfruit plant finally bloomed. Took patience, fire, and a little bit of destiny. Some things are born to rule the garden.',
                 'plant_name': None,
                 'timestamp': '2025-11-14T18:45:00',
                 'likes': 5,
                 'liked_by': []
             }
+
+
+
         ]
 
 

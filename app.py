@@ -93,9 +93,9 @@ except Exception:
     def check_and_award_badges():
         pass
 
-# Add to st.set_page_config():
+# Page config MUST be first Streamlit command
 st.set_page_config(
-    page_title="🌳 AirCare - Plant Smarter",
+    page_title="🌳 Filtree - Plant Smarter",
     page_icon="🌳",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -107,11 +107,11 @@ if 'first_visit' not in st.session_state:
 
 if st.session_state.first_visit:
     st.markdown("""
-    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+    <div style='background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%); 
                 color: white; padding: 20px; border-radius: 15px; text-align: center;
                 margin: 10px 0 20px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
-        <p style='font-size: 20px; margin: 0; font-weight: bold;'>
-            📱 First time here?
+        <p style='font-size: 22px; margin: 0; font-weight: bold;'>
+            🌳 Welcome to Filtree!
         </p>
         <p style='font-size: 16px; margin: 12px 0 0 0;'>
             Tap the <strong style='background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;'>≡</strong> 
@@ -126,6 +126,7 @@ if st.session_state.first_visit:
 
 
 def load_user_data_if_logged_in():
+
     if st.session_state.get('logged_in', False) and st.session_state.get('user_id'):
         # Load planted trees if not already loaded
         if 'planted_trees' not in st.session_state or st.session_state.planted_trees is None:
@@ -164,8 +165,6 @@ def load_user_data_if_logged_in():
                     location_data['latitude'],
                     location_data['longitude']
                 )
-
-
 def add_plant_to_garden_safe(plant_data):
     """Universal function to add plant with proper initialization"""
     plant = standardize_plant_data(plant_data)
@@ -271,8 +270,6 @@ def load_user_location():
 
     except Exception as e:
         return None
-
-
 def standardize_plant_data(plant):
     """
     Ensure all plants have consistent field names.
@@ -310,8 +307,6 @@ def standardize_plant_data(plant):
             plant[key] = default_value
 
     return plant
-
-
 # Load environment
 load_dotenv()
 
@@ -363,7 +358,7 @@ def show_welcome_screen():
     # Hero Section
     st.markdown("""
     <div class="welcome-container">
-        <div class="welcome-title">🌳 AirCare</div>
+        <div class="welcome-title">🌳 Filtree</div>
         <div class="welcome-subtitle">Plant Smarter. Breathe Better.</div>
         <p style="font-size: 16px; margin-top: 20px;">
             Your personal assistant for growing trees scientifically<br>
@@ -513,7 +508,7 @@ def show_welcome_screen():
     # Footer
     st.markdown("---")
     st.caption(
-        "🔒 Your data is stored locally and never shared. By using AirCare, you agree to plant trees responsibly.")
+        "🔒 Your data is stored locally and never shared. By using Filtree, you agree to plant trees responsibly.")
 
 
 def detect_user_state():
@@ -547,8 +542,6 @@ def show_first_plant_celebration():
     """, unsafe_allow_html=True)
 
     time.sleep(3)
-
-
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
 
@@ -579,7 +572,7 @@ def init_user_session():
         return True
 
     # 2. If NOT logged in, decide which form to show
-    st.title("🌳 Welcome to AirCare")
+    st.title("🌳 Welcome to Filtree")
 
     # CASE A: User needs to create a profile (New User)
     if st.session_state.get('show_profile_form', False):
@@ -670,8 +663,6 @@ def init_user_session():
                 st.rerun()
 
     return False  # Stop execution while on login screen
-
-
 # ===========================
 # AIR QUALITY FUNCTIONS
 # ===========================
@@ -825,6 +816,7 @@ def get_aqi_action_plan(aqi_index, pm25, location_data):
 
 def recommend_plants_by_aqi(pm25, aqi_index):
     """Recommend specific plants based on current pollution levels"""
+
 
     # Get full plant database
     all_trees = get_tree_data()
@@ -1202,8 +1194,6 @@ if st.session_state.get('show_plant_selector', False):
         st.rerun()
 
     st.markdown("---")
-
-
 # ===========================
 # Initialize session state
 # ===========================
@@ -1380,12 +1370,11 @@ with st.sidebar:
                 st.download_button(
                     label="💾 Download Database",
                     data=json_str,
-                    file_name=f"aircare_full_backup_{datetime.datetime.now().strftime('%Y%m%d')}.json",
+                    file_name=f"filtree_full_backup_{datetime.datetime.now().strftime('%Y%m%d')}.json",
                     mime="application/json"
                 )
 display_profile_sidebar()
 display_tree_svg()
-
 
 # ===========================
 # Utility Functions
@@ -1412,7 +1401,7 @@ def ensure_tree_has_fields(tree):
 # HOME PAGE
 # ===========================
 if st.session_state.current_page == "Home":
-    st.title("🌳 AirCare - Smart Tree & Air Quality Planner")
+    st.title("🌳 Filtree - Smart Tree & Air Quality Planner")
 
     if st.session_state.location and OPENWEATHER_API_KEY:
         lat = st.session_state.location['latitude']
@@ -1552,7 +1541,7 @@ if 'lat' in query_params and 'lon' in query_params:
     try:
         lat = float(query_params['lat'])
         lon = float(query_params['lon'])
-        geolocator = Nominatim(user_agent="aircare_planner")
+        geolocator = Nominatim(user_agent="filtree_planner")
         location = geolocator.reverse(f"{lat}, {lon}")
         st.session_state.location = {
             "address": location.address if location else f"{lat},{lon}",
@@ -1625,9 +1614,10 @@ elif st.session_state.current_page == "🌫️ Air Quality Hub":
                     <h1 style='color: white; margin: 0;'>{label}</h1>
                     <h3 style='color: white; margin: 10px 0 0 0;'>Air Quality Level: {aqi['aqi_index']} of 5</h3>
                     <p style='color: white; font-size: 14px; margin: 8px 0; opacity: 0.9;'>1 = Good | 2 = Fair | 3 = Moderate | 4 = Poor | 5 = Very Poor</p>
-                    <p style='color: white; margin: 5px 0 0 0; opacity: 0.8;'>Updated: {aqi['timestamp'].strftime('%I:%M %p')}</p>
+                    <p style='color: white; margin: 5px 0 0 0; opacity: 0.8; font-size: 12px;'>Updated: {aqi['timestamp'].strftime('%I:%M %p')}</p>
                 </div>
                 """, unsafe_allow_html=True)
+
 
                 # Pollutant metrics
                 st.subheader("🔬 Pollutant Levels")
@@ -2039,7 +2029,7 @@ elif st.session_state.current_page == "🌿 My Garden":
 # TOOLS PAGE (3 TABS: AIR CALCULATOR, HOME AIR SCORE, PLANT DOCTOR)
 # ===========================
 elif st.session_state.current_page == "🧮 Tools":
-    st.header("🧮 AirCare Tools")
+    st.header("🧮 Filtree Tools")
     st.info(
         "💡 Use these tools to calculate plant needs, assess your home's air quality, and diagnose plant health issues")
 
@@ -2266,7 +2256,7 @@ elif st.session_state.current_page == "🩺 Plant Doctor":
 # MARKETPLACE
 # ===========================
 elif st.session_state.current_page == "🛒 Marketplace":
-    st.header("🛒 AirCare Marketplace")
+    st.header("🛒 Filtree Marketplace")
     st.info("🚧 **Coming Soon!** Browse plants, seeds, pots, and air quality products")
 
     # Import marketplace data
@@ -2335,12 +2325,12 @@ elif st.session_state.current_page == "Community":
 # (MERGED FROM TPP.py for more detail)
 # ===========================
 elif st.session_state.current_page == "About":
-    st.header("About the Tree Plantation Planner")
+    st.header("About Filtree")
 
     # Project Overview
     st.subheader("🌍 Project Objective")
     st.markdown("""
-    The Tree Plantation Planner is designed to guide people in making smarter planting choices. 
+    Filtree is designed to guide people in making smarter planting choices. 
     By recommending the right trees and plants for the right places, it ensures that plantation efforts actually 
     benefit the environment, improve air quality, and support biodiversity—whether you're planting in a forest, 
     backyard, or urban balcony.
@@ -2659,5 +2649,6 @@ elif st.session_state.current_page == "About":
     with col3:
         if st.button("👥 Join Community", type="secondary", width='stretch'):
             navigate_to("Community")
+
 
 st.markdown("---")
